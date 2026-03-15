@@ -1,22 +1,32 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file           : main.c
-  * @brief          : Main program body
-  ******************************************************************************
-  * @attention
+  * @file    main.c
+  * @brief   Vehicle Environment Monitoring System using STM32
   *
-  * Copyright (c) 2026 STMicroelectronics.
-  * All rights reserved.
+  * @details
+  * This application implements an environmental monitoring prototype using
+  * an STM32F103RB microcontroller. The system reads environmental data from:
   *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *  - DHT11 sensor for temperature and humidity measurement
+  *  - MQ-series gas sensor for gas concentration detection
   *
+  * The STM32 periodically acquires sensor data and transmits formatted
+  * monitoring information through UART for real-time observation on a
+  * serial terminal.
+  *
+  * System workflow:
+  *  1. Read temperature and humidity from DHT11
+  *  2. Read gas concentration via ADC from MQ sensor
+  *  3. Format sensor data
+  *  4. Transmit monitoring data via UART
+  *
+  * @author  Hang
+  * @date    2026
   ******************************************************************************
   */
 /* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
+
 #include "main.h"
 
 /* Private includes ----------------------------------------------------------*/
@@ -27,35 +37,45 @@
 
 #include "DHT.h"
 #include "MQ.h"
-
 /* USER CODE END Includes */
 
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
-
 /* Private variables ---------------------------------------------------------*/
+
+/**
+ * @brief ADC handle for MQ gas sensor reading
+ */
 ADC_HandleTypeDef hadc1;
 
+/**
+ * @brief UART handle used for serial communication
+ */
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 
+/**
+ * @brief Structure storing DHT11 sensor data
+ */
 DHT_DataTypedef DHT11_Data;
+
+/**
+ * @brief Temperature value read from DHT11 (°C)
+ */
 float Temperature;
+
+/**
+ * @brief Humidity value read from DHT11 (%)
+ */
 float Humidity;
+
+/**
+ * @brief Gas sensor ADC value
+ */
 uint32_t GasValue;
+
+/**
+ * @brief Sample counter used for UART monitoring output
+ */
 int i = 0;
 
 /* USER CODE END PV */
@@ -65,13 +85,17 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_ADC1_Init(void);
-/* USER CODE BEGIN PFP */
 
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+/**
+ * @brief Redirect printf output to UART
+ *
+ * @param ch Character to transmit
+ * @return int Transmitted character
+ *
+ * @note Allows usage of printf() for serial debugging
+ */
 #ifdef __GNUC__
 #define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
 #else
@@ -86,70 +110,69 @@ PUTCHAR_PROTOTYPE
 
 /* USER CODE END 0 */
 
+
 /**
-  * @brief  The application entry point.
-  * @retval int
+  * @brief  Main program entry point
+  *
+  * @details
+  * Initializes system peripherals and continuously performs:
+  *
+  *  - Reading temperature and humidity from DHT11 sensor
+  *  - Reading gas concentration from MQ sensor via ADC
+  *  - Sending formatted monitoring data through UART
+  *
+  * Sensor data is updated every 2 seconds.
+  *
+  * @retval int (never returns)
   */
 int main(void)
 {
 
-  /* USER CODE BEGIN 1 */
+  /* MCU Configuration --------------------------------------------------------*/
 
-  /* USER CODE END 1 */
-
-  /* MCU Configuration--------------------------------------------------------*/
-
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  /* Initialize HAL Library */
   HAL_Init();
 
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
+  /* Configure system clock */
   SystemClock_Config();
 
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
+  /* Initialize peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_ADC1_Init();
-  /* USER CODE BEGIN 2 */
-
-  /* USER CODE END 2 */
 
   /* Infinite loop */
-  /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+    /* Read environmental data from DHT11 sensor */
+    DHT_GetData(&DHT11_Data);
 
-	  DHT_GetData(&DHT11_Data);
+    Temperature = DHT11_Data.Temperature;
+    Humidity    = DHT11_Data.Humidity;
 
-	  Temperature = DHT11_Data.Temperature;
-	  Humidity = DHT11_Data.Humidity;
+    /* Read gas sensor value using ADC */
+    GasValue = MQ_Read();
 
-	  GasValue = MQ_Read();
+    /* Transmit formatted monitoring data via UART */
+    printf("%d.Temp: %.1fC - Hum: %.1f%% - Gas:%lu\r\n",
+           i++,
+           Temperature,
+           Humidity,
+           GasValue);
 
-	  printf("%d.Temp: %.1fC - Hum: %.1f%% - Gas:%lu\r\n",
-	          i++,
-	          Temperature,
-	          Humidity,
-	          GasValue);
-
-	  HAL_Delay(2000);
+    /* Sampling interval */
+    HAL_Delay(2000);
   }
-  /* USER CODE END 3 */
 }
 
+
 /**
-  * @brief System Clock Configuration
-  * @retval None
+  * @brief Configure system clock
+  *
+  * @details
+  * Initializes HSE oscillator and configures PLL to generate
+  * the system clock used by the STM32F103 microcontroller.
   */
 void SystemClock_Config(void)
 {
